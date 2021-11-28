@@ -38,11 +38,11 @@ namespace operations_research{
         return routes;
     }
     
-    vector<vector<int>> GenerateSamples(int num_samples)
+    vector<vector<int>> GenerateSamples(int num_samples, int max_range, int min_range)
     //void GenerateSamples(int num_samples,vector<vector<int>>& source_data)
     {
         vector<vector<int>> source_data(num_samples, vector<int>(2, 0));
-        int min_range = -500, max_range = 500;
+        //int min_range = -500, max_range = 500;
         random_device rand_dev;
         //mt19937 generator(rand_dev());
         default_random_engine  generator(rand_dev());

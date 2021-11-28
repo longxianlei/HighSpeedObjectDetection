@@ -49,6 +49,10 @@ void ConvertImage::process_image()
 			cout << "Image queue is empty" << endl;
 			break;
 		}
+		else
+		{
+			cout << "Image queue is: " << image_safe_queue.size() << "img list number is not full: " << img_list1.size() << endl;
+		}
 	}
 }
 

@@ -29,7 +29,7 @@ void ObjectDetector::initialization(cv::String cfg, cv::String weight, int input
     while (getline(ifs, line))classes.push_back(line);
 }
 
-bool  ObjectDetector::inference(cv::Mat& frame)
+bool  ObjectDetector::inference(cv::Mat& frame, int frame_id)
 {
     cv::Mat blob = cv::dnn::blobFromImage(frame, 1.0 / 255.0, { inpWidth, inpHeight}, 0.00392, true); //1.0 / 255.0  0.00392
     net.setInput(blob);
@@ -38,9 +38,10 @@ bool  ObjectDetector::inference(cv::Mat& frame)
         net.forward(detectionMat, getOutputsNames(net));
     }
     catch (cv::Exception& e) {
+        cout << "EXCEPTION!!!" << endl;
         return false;
     }
-    bool is_detected = postprocess(frame, detectionMat);
+    bool is_detected = postprocess(frame, detectionMat, frame_id);
     return is_detected;
 }
 
@@ -66,7 +67,7 @@ vector<String>  ObjectDetector::getOutputsNames(const cv::dnn::Net& net)
 }
 
 // Remove the bounding boxes with low confidence using non-maxima suppression.
-bool ObjectDetector::postprocess(cv::Mat& frame, const vector<cv::Mat>& outs)
+bool ObjectDetector::postprocess(cv::Mat& frame, const vector<cv::Mat>& outs, int frame_id)
 {
     vector<int> classIds;//储存识别类的索引
     vector<float> confidences;//储存置信度
@@ -99,13 +100,37 @@ bool ObjectDetector::postprocess(cv::Mat& frame, const vector<cv::Mat>& outs)
     vector<int> indices;//保存没有重叠边框的索引
     //该函数用于抑制重叠边框
     cv::dnn::NMSBoxes(boxes, confidences, confThreshold, nmsThreshold, indices);
+
+    // Is the target object detected?
+    bool is_target = false;
+
     for (size_t i = 0; i < indices.size(); i++) {
+        
+        is_target = false; 
         int idx = indices[i];
         cv::Rect box = boxes[idx];
-        //cout <<"class: "<< classIds[idx] <<", conf: " << confidences[idx] << endl;
+        cout <<"class: "<< classIds[idx] <<", conf: " << confidences[idx] << endl;
+        is_target = classIds[idx] == 2;
+
         drawPred(classIds[idx], confidences[idx], box.x, box.y,
             box.x + box.width, box.y + box.height, frame);
+
+        //cout << is_target << endl;
+        if (is_target)
+        {
+
+
+            
+            detected_results.detected_conf.push_back(confidences[idx]);
+            detected_results.detected_box.push_back(box);
+            detected_results.detected_ids.push_back(frame_id);
+            //detected_conf.push_back(confidences[idx]);
+            //detected_box.push_back(box);
+            //detected_ids.push_back(frame_id);
+        }
+        
     }
+    //return is_target; 
     return indices.size() > 0 ? true : false;
 }
 

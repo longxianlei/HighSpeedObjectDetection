@@ -47,7 +47,7 @@ namespace operations_research {
 
     // @brief Generate Samples using random sampling. The distribution is uniform distribution.
     //void GenerateSamples(int num_samples, vector<vector<int>> & source_data);
-    vector<vector<int>> GenerateSamples(int num_samples);
+    vector<vector<int>> GenerateSamples(int num_samples, int max_range, int min_range);
 
     // @brief Computue the distance matrix given the sample points.
     vector<vector<int64_t>> ComputeChebyshevDistanceMatrix(int num_samples, vector<vector<int>>& scan_data);

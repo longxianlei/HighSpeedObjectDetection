@@ -13,6 +13,14 @@
 using namespace std;
 using namespace cv;
 
+
+struct DetectedResults
+{
+	vector<float> detected_conf;
+	vector<Rect> detected_box;
+	vector<int> detected_ids;
+};
+
 class ObjectDetector {
 public:
 	ObjectDetector();
@@ -25,11 +33,19 @@ public:
 	int inpHeight = 416;//ÍøÂçÊäÈëÍ¼Æ¬¸ß¶È
 	vector<string> classes;//´¢´æÃû×ÖµÄÈİÆ÷
 	cv::dnn::Net net;
+
+	//vector<float> detected_conf;
+	//vector<Rect> detected_box;
+	//vector<int> detected_ids;
+	DetectedResults detected_results;
+	//detected_results.
+
+
 public:
 	void initialization(cv::String cfg, cv::String weight, int input_width, int input_height);
-	bool inference(cv::Mat& frame);
+	bool inference(cv::Mat& frame, int frame_id);
 	vector<String> getOutputsNames(const cv::dnn::Net& net);
-	bool postprocess(cv::Mat& frame, const vector<cv::Mat>& outs);
+	bool postprocess(cv::Mat& frame, const vector<cv::Mat>& outs, int frame_id);
 	void drawPred(int classId, float conf, int left, int top, int right, int bottom, cv::Mat& frame);
 };
 
