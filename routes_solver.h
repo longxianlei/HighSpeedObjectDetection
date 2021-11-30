@@ -52,7 +52,7 @@ namespace operations_research {
     // @brief Computue the distance matrix given the sample points.
     vector<vector<int64_t>> ComputeChebyshevDistanceMatrix(int num_samples, vector<vector<int>>& scan_data);
     //void ComputeChebyshevDistanceMatrix(int num_samples, vector<vector<int>>& scan_data, vector<vector<int64_t>>& chebyshev_dist);
-    
+
     //// @brief Calculate the start and end points of the sample points. 
     //// Start point closet to [-5,-5]; End point closet to [5, 5].
     int* CalculateStartEndPoints(vector<vector<int>>& scan_data);

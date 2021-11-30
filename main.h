@@ -6,9 +6,9 @@
 // DA Contorller Setting.
 #define COM_PORT			3
 #define DA_STEP_PCT			1		// %
-#define DA_STEP_TIME		0.2		// ms
+#define DA_STEP_TIME		0.25		// ms
 #define DA_STEP_DLY			0.1		// us
-#define DA_EXP				800	// us    should be same with HC_EXP
+#define DA_EXP				1000	// us    should be same with HC_EXP
 #define DA_CYCLE			2500	// us
 #define DA_PULSE_W			100		// us
 
@@ -20,7 +20,7 @@
 #define MID_HEIGHT 224  //540
 #define MID_EXPOSURE_MODE HV_CAM_DAHUA::EXPOSURE_AUTO_MODE_OFF
 #define MID_BALANCEWHITE_MODE HV_CAM_DAHUA::BALANCEWHITE_AUTO_OFF
-#define MID_EXPOSURE_TIME 800
+#define MID_EXPOSURE_TIME 1000
 #define MID_REVERSE_X false
 #define MID_REVERSE_Y false
 #define MID_GAIN_RAW 10

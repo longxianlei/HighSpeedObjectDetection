@@ -1,4 +1,4 @@
-#include "hv_cam_dahua.h"
+#include "HV_CAM_DAHUA.h"
 #include <queue>
 
 threadsafe_queue<CFrame> image_safe_queue;

@@ -39,7 +39,7 @@ void ConvertImage::process_image()
 			status1 = IMGCNV_ConvertToBGR24((unsigned char*)pImage1, &openParam1, pBGRbuffer, &nBGRBufferSize1);
 			image1 = Mat(pFrame1.getImageHeight(), pFrame1.getImageWidth(), CV_8UC3, (uint8_t*)pBGRbuffer);
 
-			img_list1.push_back(image1.clone());
+			img_list1.emplace_back(image1.clone());
 			delete pBGRbuffer;
 		}
 		this_thread::sleep_for(chrono::microseconds(1000));
@@ -55,5 +55,3 @@ void ConvertImage::process_image()
 		}
 	}
 }
-
-
