@@ -7,7 +7,7 @@ ObjectDetector::ObjectDetector()
 
 ObjectDetector::~ObjectDetector()
 {
-
+    
 }
 
 void ObjectDetector::initialization(cv::String cfg, cv::String weight, int input_width, int input_height)
