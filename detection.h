@@ -21,13 +21,14 @@ struct DetectedResults
 	vector<int> detected_ids;
 };
 
-
 struct ResampleCenters
 {
 	int num_samples;
 	float center_x;
 	float center_y;
+	float confidence;
 };
+
 
 class ObjectDetector {
 public:

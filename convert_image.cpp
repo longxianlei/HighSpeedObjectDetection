@@ -55,3 +55,5 @@ void ConvertImage::process_image()
 		}
 	}
 }
+
+

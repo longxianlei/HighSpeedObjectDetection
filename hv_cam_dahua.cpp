@@ -1,4 +1,4 @@
-#include "HV_CAM_DAHUA.h"
+#include "hv_cam_dahua.h"
 #include <queue>
 
 threadsafe_queue<CFrame> image_safe_queue;
@@ -99,7 +99,7 @@ void HV_CAM_DAHUA::onCallbackfun(const CFrame& pFrame)
 	////imshow("1", image);
 	////waitKey(100);
 
-	//img_list.push_back(image.clone());
+	//img_list.emplace_back(image.clone());
 	//delete pBGRbuffer;
 	//chrono::steady_clock::time_point end_time = chrono::steady_clock::now();
 	//cout << "get image to queue cost time: " << chrono::duration_cast<chrono::microseconds>(end_time - begin_time).count() << endl;

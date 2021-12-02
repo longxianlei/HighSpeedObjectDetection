@@ -26,7 +26,7 @@ void ObjectDetector::initialization(cv::String cfg, cv::String weight, int input
     ifstream ifs(classesFile.c_str());
     string line;
     //vector<string> classes;
-    while (getline(ifs, line))classes.push_back(line);
+    while (getline(ifs, line))classes.emplace_back(line);
 }
 
 bool  ObjectDetector::inference(cv::Mat& frame, int frame_id)
@@ -90,9 +90,9 @@ bool ObjectDetector::postprocess(cv::Mat& frame, const vector<cv::Mat>& outs, in
                 int height = (int)(data[3] * frame.rows);
                 int left = centerX - width / 2;
                 int top = centerY - height / 2;
-                classIds.push_back(classIdPoint.x);
-                confidences.push_back((float)confidence);
-                boxes.push_back(cv::Rect(left, top, width, height));
+                classIds.emplace_back(classIdPoint.x);
+                confidences.emplace_back((float)confidence);
+                boxes.emplace_back(cv::Rect(left, top, width, height));
             }
         }
     }
@@ -103,7 +103,7 @@ bool ObjectDetector::postprocess(cv::Mat& frame, const vector<cv::Mat>& outs, in
 
     // Is the target object detected?
     bool is_target = false;
-
+    bool is_target_frame = false;
     for (size_t i = 0; i < indices.size(); i++) {
         
         is_target = false; 
@@ -118,20 +118,16 @@ bool ObjectDetector::postprocess(cv::Mat& frame, const vector<cv::Mat>& outs, in
         //cout << is_target << endl;
         if (is_target)
         {
-
-
-            
-            detected_results.detected_conf.push_back(confidences[idx]);
-            detected_results.detected_box.push_back(box);
-            detected_results.detected_ids.push_back(frame_id);
-            //detected_conf.push_back(confidences[idx]);
-            //detected_box.push_back(box);
-            //detected_ids.push_back(frame_id);
+            is_target_frame = true;
+            detected_results.detected_conf.emplace_back(confidences[idx]);
+            detected_results.detected_box.emplace_back(box);
+            detected_results.detected_ids.emplace_back(frame_id);
         }
         
     }
+    return is_target_frame;
     //return is_target; 
-    return indices.size() > 0 ? true : false;
+    //return indices.size() > 0 ? true : false;
 }
 
 void ObjectDetector::drawPred(int classId, float conf, int left, int top, int right, int bottom, cv::Mat& frame) {

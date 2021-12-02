@@ -5,11 +5,11 @@
 #include <sys/stat.h>
 #include <direct.h>
 #include <io.h>
+#include <unordered_map>
 
 #include "main.h"
 #include "hv_cam_dahua.h"
 #include "routes_solver.h"
-#include "hv_cam_dahua.h"
 #include "sigma_controller.h"
 #include "convert_image.h"
 #include "detection.h"
@@ -23,6 +23,7 @@ HV_CAM_DAHUA midcamera = HV_CAM_DAHUA();
 vector<vector<float>> gen_scan_routes;
 ObjectDetector detector = ObjectDetector();
 int scan_samples;
+
 vector<vector<float>> SolveScanRoutes(int sample_nums, int max_range, int min_range);
 void SendXYSignal();
 bool SendSolvedXYSignal(vector<vector<float>>& solved_scan_voltages);
@@ -30,21 +31,18 @@ void InitializeComPort();
 bool ConnectSettingCamera();
 bool CloseCamera();
 void InitializeDetector(String cfg_file, String weights_file);
-
 int GenerateResample(vector<vector<float>>& detected_objs_voltages,
-	DetectedResults& detected_results,
-	vector<ResampleCenters>& resample_centers);
-void NMSResamples(vector<ResampleCenters>& resample_centers,
-	vector<ResampleCenters>& filtered_centers,
-	int total_samples);
-
+					  DetectedResults& detected_results,
+					  vector<ResampleCenters>& resample_centers);
+void NMSResamples(vector<ResampleCenters>& resample_centers, vector<ResampleCenters>& filtered_centers, int total_samples);
 void CreateFolder(string dir_name);
+
 
 int main()
 {
-	cv::String cfg_file = "C:\\CODEREPO\\DahuaGal1115\\DahuaGal\\model\\yolov4-tiny.cfg";
-	cv::String weights_file = "C:\\CODEREPO\\DahuaGal1115\\DahuaGal\\model\\yolov4-tiny.weights";
-	scan_samples = 147;
+	cv::String cfg_file = "C:\\CODEREPO\\DahuaGal\\model\\yolov4.cfg";
+	cv::String weights_file = "C:\\CODEREPO\\DahuaGal\\model\\yolov4.weights";
+	scan_samples = 148;
 	string dir_name = "new_scan_samples_" + to_string(scan_samples);
 	CreateFolder(dir_name);
 
@@ -107,9 +105,7 @@ int main()
 
 
 	send_com_thread.detach();
-	std::cout << "send over!!!!!!!!!!!!!!!!!!" << endl;
 	convert_image_thread.detach();
-	std::cout << "convert over!!!!!!!!!!!!!" << endl;
 
 	//initialization_detect_thread.detach();
 
@@ -124,13 +120,9 @@ int main()
 
 	chrono::steady_clock::time_point begin_detect = chrono::steady_clock::now();
 
-	//ObjectDetector* detector_new = new ObjectDetector;
-
-	//detector_new->initialization(cfg_file, weights_file, 224, 224);
-
 	Mat grab_img1;
 	vector<vector<float>> detected_objs_voltages;
-
+	//unordered_map<int, vector<vector<float>>> detected_index_vols;
 	for (int i = 0; i < img_list1.size(); i++)
 	{
 		//cout << "begin to detect " << i << endl;
@@ -140,6 +132,8 @@ int main()
 		{
 			real_img += 1;
 			bool is_detected = detector.inference(grab_img1, i);
+
+
 			//cout << "Is detect: " << is_detected << endl;
 			//cv::imshow("test", grab_img1);
 			//cv::waitKey(500);
@@ -151,51 +145,36 @@ int main()
 				filename << "./Image/" << dir_name << "/1127_" << i << "_" << gen_scan_routes[i][0] << "_" << gen_scan_routes[i][1] << ".jpg";
 				//cv::Mat grab_img = img_list1[i];
 				detected_objs_voltages.emplace_back(gen_scan_routes[i]);
+				//detected_index_vols.emplace(i, gen_scan_routes[i]);
 				cv::imwrite(filename.str(), grab_img1);
 			}
 		}
 	}
 
-	chrono::steady_clock::time_point end_detect = chrono::steady_clock::now();
-	std::cout << "The detetcion process is  get clock (ms): !!!!!!!!!!!!!" << chrono::duration_cast<chrono::microseconds>(end_detect - begin_detect).count() / 1000 << endl;
-	std::cout << "Processing speed: " << real_img * 1000000.0 / float(chrono::duration_cast<chrono::microseconds>(end_detect - begin_detect).count()) << " FPS!" << endl;
-
 	chrono::steady_clock::time_point post_proc1 = chrono::steady_clock::now();
 	vector<ResampleCenters> resample_centers;
-	vector<ResampleCenters> nms_cenetrs;
-	int total_samples=0;
+	vector<ResampleCenters> filtered_centers;
+	int total_sample_nums = 0;
 	if (detected_objs_voltages.size() > 0)
 	{
-		total_samples=GenerateResample(detected_objs_voltages, detector.detected_results, resample_centers);
-		NMSResamples(resample_centers, nms_cenetrs, total_samples);
+		total_sample_nums= GenerateResample(detected_objs_voltages, detector.detected_results, resample_centers);
+		NMSResamples(resample_centers, filtered_centers, total_sample_nums);
 	}
-	
+
+	chrono::steady_clock::time_point end_detect = chrono::steady_clock::now();
+	std::cout << "The NMS process is  get clock (us): !!!!!!!!!!!!!" << chrono::duration_cast<chrono::microseconds>(end_detect - post_proc1).count() << endl;
+	std::cout << "The detetcion process is  get clock (ms): !!!!!!!!!!!!!" << chrono::duration_cast<chrono::microseconds>(end_detect - begin_detect).count() / 1000 << endl;
+	std::cout << "Processing speed: " << real_img*1000000.0 / float(chrono::duration_cast<chrono::microseconds>(end_detect - begin_detect).count()) << " FPS!" << endl;
+
 	for (auto i : resample_centers)
 	{
-		cout << "before filtered: " << i.num_samples << ",  " << i.center_x << ", " << i.center_y << endl;
+		cout << "before filtered: " << i.num_samples << ",  " << i.center_x << ", " << i.center_y << ", " << i.confidence << endl;
 	}
-	for (auto j : nms_cenetrs)
+	for (auto j : filtered_centers)
 	{
-		cout << "after filtered: " << j.num_samples << ",  " << j.center_x << ", " << j.center_y << endl;
+		cout << "after filtered: " << j.num_samples << ",  " << j.center_x << ", " << j.center_y << ", " << j.confidence << endl;
 	}
 
-	//for (auto voltages_xy : detectedbjs_voltages)
-	//{
-	//	cout << "detected objs voltages: " << voltages_xy[0]<<", " << voltages_xy[1] << endl;
-	//}
-	//for (auto conf : detector.detected_conf)
-	//{
-	//	cout << "Detected confidence:" << conf << endl;
-	//}
-	//for (auto detect_box : detector.detected_box)
-	//{
-	//	cout << "Detected box: " << detect_box.x << detect_box.y << detect_box.width << detect_box.height << endl;
-	//}
-
-
-
-	chrono::steady_clock::time_point post_proc2 = chrono::steady_clock::now();
-	std::cout << "The detetcion process is  get clock (us): !!!!!!!!!!!!!" << chrono::duration_cast<chrono::microseconds>(post_proc2 - post_proc1).count()  << endl;
 
 	/* 6. Disconnect and close the camera.*/
 	img_list1.clear();
@@ -205,23 +184,24 @@ int main()
 	return 0;
 }
 
-
+// NMS filter out the same samples in different frames, using abs error. (Chebyshv distance.)
+// filter_out abs_error(sample_i, sample_j)<0.06 .
 void NMSResamples(vector<ResampleCenters>& resample_centers, vector<ResampleCenters>& filtered_centers, int total_samples)
 {
 	int len = resample_centers.size();
 	vector<bool> is_checked(len, false);
-	int filter_out = 0, remain_nums = 0;
+	int remain_nums = 0;
 	for (int i = 0; i < len; i++)
 	{
 		bool is_filtered = false;
-		if (i < len - 1)
+		if (i < len - 1 && is_checked[i]==false) // i=len-1, j=len, the vector will access failed. Segment fault.
 		{
-			for (int j = i + 1 ; j < len; j++)
+			for (int j = i + 1; j < len; j++)
 			{
 				float abs_x = abs(resample_centers[i].center_x - resample_centers[j].center_x);
 				float abs_y = abs(resample_centers[i].center_y - resample_centers[j].center_y);
 				double abs_error = double(abs_x) + double(abs_y);
-				if (abs_error < 0.06 )
+				if (abs_error < 0.06)
 				{
 					if (resample_centers[i].num_samples > resample_centers[j].num_samples)
 					{
@@ -243,7 +223,7 @@ void NMSResamples(vector<ResampleCenters>& resample_centers, vector<ResampleCent
 		}
 	}
 	int len_filtered = filtered_centers.size();
-	int avg_sample = (total_samples- remain_nums) / len_filtered;
+	int avg_sample = (total_samples - remain_nums) / len_filtered;
 	int last_samples = (total_samples - remain_nums) - avg_sample * (len_filtered - 1);
 	for (int i = 0; i < len_filtered; i++)
 	{
@@ -256,45 +236,42 @@ void NMSResamples(vector<ResampleCenters>& resample_centers, vector<ResampleCent
 			filtered_centers[i].num_samples += last_samples;
 		}
 	}
-	//cout <<"total: " << total_samples << "total remain: " << remain_nums << " filterout " << filter_out << endl;
 }
+
+// Generate Resample points (x,y) around the center of detected objs.
+// num_resample_i = total_samples* conf_i / total_conf.
 int GenerateResample(vector<vector<float>>& detected_objs_voltages, DetectedResults& detected_results, vector<ResampleCenters>& resample_centers)
 {
 	int nums_detected = detected_results.detected_box.size();
-
 	int newly_scan_samples = 0.9 * scan_samples;
 	int global_scan_samples = scan_samples - newly_scan_samples;
-	float total_confs = 0.001;
+	float total_confs=0.001;
 	for (auto i : detected_results.detected_conf)
 	{
 		total_confs += i;
 	}
-	//cout << "total confidences: " << total_confs << endl;
 
+	int previous_id = detected_results.detected_ids[0];
 	int voltage_index = 0;
-	int pre_id = detected_results.detected_ids[0];
-	ResampleCenters temp_resample;
+	ResampleCenters temp_centers;
 	for (int i = 0; i < nums_detected; i++)
 	{
 		int scan_id = detected_results.detected_ids[i];
-		if (scan_id != pre_id)
+		if (scan_id!=previous_id)
 		{
 			voltage_index += 1;
-			pre_id = scan_id;
+			previous_id = scan_id;
 		}
-		//cout << "scan id: " << scan_id << endl;
 		float samples_i_x = detected_objs_voltages[voltage_index][0], samples_i_y = detected_objs_voltages[voltage_index][1];
-		//cout << "scan ix: " << samples_i_x << ", scan iy: " << samples_i_y << endl;
 		float sample_conf_i = detected_results.detected_conf[i];
 		Rect sample_box_i = detected_results.detected_box[i];
-		float complement_i_x = ((sample_box_i.x + sample_box_i.width / 2.0) - 112.0) * 0.002;
+		float complement_i_x = ((sample_box_i.x + sample_box_i.width / 2.0) - 112.0) * 0.002; // 224 pixel <--> 0.45
 		float complement_i_y = ((sample_box_i.y + sample_box_i.height / 2.0) - 112.0) * 0.002;
 		float real_x = samples_i_x + complement_i_x, real_y = samples_i_y + complement_i_y;
-		//cout << real_x << ", " << real_y << endl;
 		int newly_samples_i = newly_scan_samples * sample_conf_i / total_confs;
-		//cout << "newly_samples: " << newly_samples_i << endl;
-		temp_resample.num_samples = newly_samples_i, temp_resample.center_x = real_x, temp_resample.center_y = real_y;
-		resample_centers.emplace_back(temp_resample);
+		temp_centers.center_x = real_x, temp_centers.center_y = real_y;
+		temp_centers.confidence = sample_conf_i, temp_centers.num_samples = newly_samples_i;
+		resample_centers.emplace_back(temp_centers);
 	}
 	return newly_scan_samples;
 }
@@ -414,7 +391,6 @@ bool SendSolvedXYSignal(vector<vector<float>>& solved_scan_voltages)
 vector<vector<float>> SolveScanRoutes(int sample_nums, int max_range, int min_range)
 {
 	chrono::steady_clock::time_point begin_time_ortools = chrono::steady_clock::now();
-
 	int num_samples = sample_nums;
 	//// 1. Generate samples;
 	vector<vector<int>> scan_samples = operations_research::GenerateSamples(num_samples, max_range, min_range);
@@ -481,7 +457,7 @@ void InitializeComPort()
 		std::cout << "====>>>> 2. Initialize the COM port failed !!!" << endl;
 	}
 	Sleep(50);
-	m_Sigmal.on_rotate1_usb(-4.5, -4.5);
+	m_Sigmal.on_rotate1_usb(-4.51, -4.51);
 	Sleep(50);
 
 }
@@ -540,7 +516,7 @@ void InitializeDetector(String cfg_file, String weights_file)
 {
 	detector.initialization(cfg_file, weights_file, 224, 224);
 	// Warm up the detector.
-	cv::Mat temp_img = cv::imread("image1.jpg");
+	cv::Mat temp_img = cv::imread("1122all_new44.jpg");
 	bool temp_result;
 	for (int i = 0; i < 5; i++)
 	{
@@ -557,14 +533,15 @@ void InitializeDetector(String cfg_file, String weights_file)
 	detector.detected_results.detected_ids.clear();
 }
 
+// Create folder.
 void CreateFolder(string dir_name)
 {
-	string folderPath = "C:\\CODEREPO\\DahuaGal1115\\DahuaGal\\Image\\" + dir_name;
+	string folderPath = "C:\\CODEREPO\\DahuaGal\\Image\\" + dir_name;
 	//std::string prefix = "G:/test/";
-	if (_access(folderPath.c_str(), 0) == -1)	//如果文件夹不存在
+	if (_access(folderPath.c_str(), 0) == -1)	//If file is not exist.
 	{
 		cout << "Dir is not exist, make dir: " << dir_name << endl;
-		int no_use=_mkdir(folderPath.c_str());
+		int no_use = _mkdir(folderPath.c_str());
 	}
 
 	//string folderPath = "C:\\CODEREPO\\DahuaGal\\Image\\" + dir_name;
