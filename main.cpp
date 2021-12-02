@@ -23,7 +23,7 @@ HV_CAM_DAHUA midcamera = HV_CAM_DAHUA();
 vector<vector<float>> gen_scan_routes;
 ObjectDetector detector = ObjectDetector();
 int scan_samples;
-
+string dir_name;
 vector<vector<float>> SolveScanRoutes(int sample_nums, int max_range, int min_range);
 void SendXYSignal();
 bool SendSolvedXYSignal(vector<vector<float>>& solved_scan_voltages);
@@ -36,14 +36,16 @@ int GenerateResample(vector<vector<float>>& detected_objs_voltages,
 					  vector<ResampleCenters>& resample_centers);
 void NMSResamples(vector<ResampleCenters>& resample_centers, vector<ResampleCenters>& filtered_centers, int total_samples);
 void CreateFolder(string dir_name);
-
+void ProcessImg();
 
 int main()
 {
+	auto beg_t =chrono::system_clock::now();
+	auto sys_time_begin = chrono::high_resolution_clock::now();
 	cv::String cfg_file = "C:\\CODEREPO\\DahuaGal\\model\\yolov4.cfg";
 	cv::String weights_file = "C:\\CODEREPO\\DahuaGal\\model\\yolov4.weights";
 	scan_samples = 148;
-	string dir_name = "new_scan_samples_" + to_string(scan_samples);
+	dir_name = "new_scan_samples_" + to_string(scan_samples);
 	CreateFolder(dir_name);
 
 	/* 1. Initialize and warm up the detector.*/
@@ -69,8 +71,8 @@ int main()
 	//thread send_com_thread(SendXYSignal);
 	thread convert_image_thread(&ConvertImage::process_image, image_convertor);
 	thread send_com_thread(SendSolvedXYSignal, ref(gen_scan_routes));
-
-
+	thread img_process_thread(ProcessImg);
+	
 	//send_com_thread.join();
 	//cout << "send over!!!!!!!!!!!!!!!!!!" << endl;
 	//convert_image_thread.join();
@@ -89,7 +91,9 @@ int main()
 		//while (midcamera.img_list.size() < scan_samples)
 	{
 		//cout << "mid camera image list: " << midcamera.img_list.size() << endl;
-		std::cout << "get img: " << img_list1.size() << endl;
+		
+		//std::cout << "get img: " << img_list1.size() << endl;
+		
 		//cout << "call back convert imgage: " << midcamera.img_list.size() << endl;
 		this_thread::sleep_for(chrono::microseconds(2000));
 	}
@@ -106,11 +110,14 @@ int main()
 
 	send_com_thread.detach();
 	convert_image_thread.detach();
+	img_process_thread.join();
+
 
 	//initialization_detect_thread.detach();
 
-	//chrono::steady_clock::time_point begin_detect1 = chrono::steady_clock::now();
 
+	
+	/*
 	// 11-22
 	std::cout << "The image list remain is: " << img_list1.size() << endl;
 
@@ -121,12 +128,16 @@ int main()
 	chrono::steady_clock::time_point begin_detect = chrono::steady_clock::now();
 
 	Mat grab_img1;
+	//Mat grab_img2;
+
 	vector<vector<float>> detected_objs_voltages;
 	//unordered_map<int, vector<vector<float>>> detected_index_vols;
+	cout <<"Total Frame in the queue: "<< img_mat_list.size() << endl;
 	for (int i = 0; i < img_list1.size(); i++)
 	{
 		//cout << "begin to detect " << i << endl;
 		grab_img1 = img_list1[i];
+		//grab_img2 = img_mat_list.wait_and_pop();
 		grab_img1 = grab_img1(cv::Rect(20, 0, 224, 224));
 		if (!grab_img1.empty())
 		{
@@ -141,16 +152,19 @@ int main()
 			if (is_detected)
 			{
 				detected_img += 1;
-				std::stringstream filename;
+				std::stringstream filename,filename2;
 				filename << "./Image/" << dir_name << "/1127_" << i << "_" << gen_scan_routes[i][0] << "_" << gen_scan_routes[i][1] << ".jpg";
+				filename2 << "./Image/" << dir_name << "/queue_1127_" << i << "_" << gen_scan_routes[i][0] << "_" << gen_scan_routes[i][1] << ".jpg";
 				//cv::Mat grab_img = img_list1[i];
 				detected_objs_voltages.emplace_back(gen_scan_routes[i]);
 				//detected_index_vols.emplace(i, gen_scan_routes[i]);
 				cv::imwrite(filename.str(), grab_img1);
+				//cv::imwrite(filename2.str(), grab_img2);
 			}
 		}
 	}
-
+	/*
+	cout << "End the list detetcion, begin to nms!" << endl;
 	chrono::steady_clock::time_point post_proc1 = chrono::steady_clock::now();
 	vector<ResampleCenters> resample_centers;
 	vector<ResampleCenters> filtered_centers;
@@ -175,6 +189,19 @@ int main()
 		cout << "after filtered: " << j.num_samples << ",  " << j.center_x << ", " << j.center_y << ", " << j.confidence << endl;
 	}
 
+	*/
+
+	
+	auto end_t = chrono::system_clock::now();
+	chrono::steady_clock::time_point end_detect = chrono::steady_clock::now();
+	auto sys_time_end = chrono::high_resolution_clock::now();
+
+	std::cout << "Total time (ms): !!!!!!!!!!!!!" << chrono::duration_cast<chrono::microseconds>(end_detect - begin_time2).count()/1000.0 << endl;
+	std::cout << "Sys Total time (ms): !!!!!!!!!!!!!" << chrono::duration_cast<chrono::microseconds>(end_t - beg_t).count() / 1000.0 << endl;
+	std::cout << "Highresol Total time (ms): !!!!!!!!!!!!!" << chrono::duration_cast<chrono::microseconds>(sys_time_end - sys_time_begin).count() / 1000.0 << endl;
+
+
+	cout << img_list1.size() << img_mat_list.size() << endl;
 
 	/* 6. Disconnect and close the camera.*/
 	img_list1.clear();
@@ -548,4 +575,53 @@ void CreateFolder(string dir_name)
 	//string command;
 	//command = "mkdir " + folderPath;
 	//system(command.c_str());
+}
+
+void ProcessImg()
+{
+	cout << "!!!!!!!! begin the Image processing thread!!!!!!!!" << endl;
+	Mat grab_img2;
+	int real_img_count = 0;
+	int detected_img = 0;
+	//chrono::steady_clock::time_point thread_begin = chrono::steady_clock::now();
+	while (1)
+	{
+		while (!img_mat_list.empty())
+		{
+			//cout << " beggin to detect: " << real_img_count << " The image is remain: " << img_mat_list.size() << endl;
+			grab_img2 = img_mat_list.wait_and_pop();
+			//vector<vector<float>> detected_objs_voltages;
+			grab_img2 = grab_img2(cv::Rect(20, 0, 224, 224));
+			if (!grab_img2.empty())
+			{
+				bool is_detected = detector.inference(grab_img2, real_img_count);
+				if (is_detected)
+				{
+					detected_img += 1;
+					std::stringstream filename2;
+					filename2 << "./Image/" << dir_name << "/thread_1127_" << real_img_count << "_" << gen_scan_routes[real_img_count][0] << "_" << gen_scan_routes[real_img_count][1] << ".jpg";
+					//detected_objs_voltages.emplace_back(gen_scan_routes[real_img_count]);
+					cv::imwrite(filename2.str(), grab_img2);
+				}
+				real_img_count += 1;
+			}
+		}
+		this_thread::sleep_for(chrono::microseconds(1000));
+		//cout << "img list in the queue: " << img_list1.size() << endl;
+		if (img_mat_list.empty() && real_img_count == scan_samples)
+		{
+			cout << "Image queue is empty" << endl;
+			break;
+		}
+		//else
+		//{
+		//	cout << "Image mat queue is: " << img_mat_list.size() << ", total processing: " << real_img_count << endl;
+		//}
+	}
+
+	detector.detected_results.detected_box.clear();
+	detector.detected_results.detected_conf.clear();
+	detector.detected_results.detected_ids.clear();
+
+	cout << "End detected thread!!!!!!" << endl;
 }

@@ -3,6 +3,7 @@
 
 
 vector<Mat> img_list1;
+threadsafe_queue<Mat> img_mat_list;
 
 ConvertImage::ConvertImage()
 {
@@ -40,6 +41,7 @@ void ConvertImage::process_image()
 			image1 = Mat(pFrame1.getImageHeight(), pFrame1.getImageWidth(), CV_8UC3, (uint8_t*)pBGRbuffer);
 
 			img_list1.emplace_back(image1.clone());
+			img_mat_list.push(image1.clone());
 			delete pBGRbuffer;
 		}
 		this_thread::sleep_for(chrono::microseconds(1000));
@@ -49,10 +51,10 @@ void ConvertImage::process_image()
 			cout << "Image queue is empty" << endl;
 			break;
 		}
-		else
-		{
-			cout << "Image queue is: " << image_safe_queue.size() << "img list number is not full: " << img_list1.size() << endl;
-		}
+		//else
+		//{
+		//	cout << "Image queue is: " << image_safe_queue.size()<<", Image processing queue is: "<<img_mat_list.size() << ", img list number is not full: " << img_list1.size() << endl;
+		//}
 	}
 }
 

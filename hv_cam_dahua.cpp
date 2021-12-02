@@ -70,12 +70,12 @@ void HV_CAM_DAHUA::onCallbackfun(const CFrame& pFrame)
 	else
 	{
 		uint64_t blockId = pFrame.getBlockId();
-		printf("blockId = %d.\n", blockId);
+		//printf("blockId = %d.\n", blockId);
 		isGrabbingFlag = true;
 	}
 
 	get_count++;
-	cout << "!!!!!!!!!Invoke Call back count: " << get_count << endl;
+	//cout << "!!!!!!!!!Invoke Call back count: " << get_count << endl;
 	//is_callback_ok = true;
 	CFrame temp = pFrame;
 	image_safe_queue.push(temp.clone());

@@ -3,6 +3,8 @@
 #define __CONVERT_IMAGE_H__
 
 #include "hv_cam_dahua.h"
+#include "thread_safe_queue.h"
+
 class ConvertImage {
 public:
 	ConvertImage();
@@ -24,5 +26,6 @@ private:
 };
 
 extern vector<Mat> img_list1;
+extern threadsafe_queue<Mat> img_mat_list;
 
 #endif // !CONVERTIMAGE_H
