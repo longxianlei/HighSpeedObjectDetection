@@ -36,8 +36,8 @@ public:
 	~ObjectDetector();
 public:
 	// Initialize the parameters.
-	float confThreshold = 0.5;//置信度阈值
-	float nmsThreshold = 0.4;//非最大抑制阈值
+	float confThreshold = 0.65;//置信度阈值
+	float nmsThreshold = 0.5;//非最大抑制阈值
 	int inpWidth = 416;//网络输入图片宽度
 	int inpHeight = 416;//网络输入图片高度
 	vector<string> classes;//储存名字的容器

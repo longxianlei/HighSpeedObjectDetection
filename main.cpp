@@ -15,14 +15,15 @@
 #include "convert_image.h"
 #include "detection.h"
 
+#define _CRT_SECURE_NO_WARNINGS
+
 using namespace std;
 using namespace cv;
 
 mutex detect_nms_mutex;
 condition_variable detect_nms_cv;
 bool is_detect_done = false;
-
-
+bool is_nms_over = false;
 
 //extern vector<Mat> img_list1;
 CSigmaController m_Sigmal;
@@ -32,30 +33,36 @@ ObjectDetector detector = ObjectDetector();
 int scan_samples;
 vector<vector<float>> detected_objs_voltages;
 string dir_name;
-//vector<vector<float>> SolveScanRoutes(int sample_nums, int max_range, int min_range);
-void SolveScanRoutes(int sample_nums, int max_range, int min_range, vector<vector<float>>& gen_scan_routes);
+bool is_save_img = true;
+float pixel_error = 0.10;
+
+
+vector<vector<float>> SolveScanRoutes(int sample_nums, int max_range, int min_range);
+//void SolveScanRoutes(int sample_nums, int max_range, int min_range, vector<vector<float>>& gen_scan_routes);
 void SendXYSignal();
-bool SendSolvedXYSignal(vector<vector<float>>& solved_scan_voltages);
+//bool SendSolvedXYSignal(vector<vector<float>>& solved_scan_voltages);
+void SendSolvedXYSignal();
 void InitializeComPort();
 bool ConnectSettingCamera();
 bool CloseCamera();
 void InitializeDetector(String cfg_file, String weights_file);
 int GenerateResample(vector<vector<float>>& detected_objs_voltages,
-					  DetectedResults& detected_results,
-					  vector<ResampleCenters>& resample_centers);
+	DetectedResults& detected_results,
+	vector<ResampleCenters>& resample_centers);
 void NMSResamples(vector<ResampleCenters>& resample_centers, vector<ResampleCenters>& filtered_centers, int total_samples);
 void CreateFolder(string dir_name);
 void threadProcessImage();
 void threadFilterResamples();
 
+
 int main()
 {
-	auto beg_t =chrono::system_clock::now();
+	auto beg_t = chrono::system_clock::now();
 	auto sys_time_begin = chrono::high_resolution_clock::now();
 	cv::String cfg_file = "C:\\CODEREPO\\DahuaGal\\model\\yolov4.cfg";
 	cv::String weights_file = "C:\\CODEREPO\\DahuaGal\\model\\yolov4.weights";
 	scan_samples = 148;
-	dir_name = "new_scan_samples_" + to_string(scan_samples);
+	dir_name = "1205_scan_samples_" + to_string(scan_samples);
 	CreateFolder(dir_name);
 
 	/* 1. Initialize and warm up the detector.*/
@@ -71,8 +78,8 @@ int main()
 
 	//vector<vector<float>> gen_scan_routes = SolveScanRoutes(scan_samples);
 
-	/*gen_scan_routes = SolveScanRoutes(scan_samples, 500, -500);*/
-	SolveScanRoutes(scan_samples, 500, -500, gen_scan_routes);
+	gen_scan_routes = SolveScanRoutes(scan_samples, 500, -500);
+	//SolveScanRoutes(scan_samples, 500, -500, gen_scan_routes);
 
 	/* 5. Processing here. Create ConvertImage object. Grab and convert the image.
 		Create 1) send (x,y) thread and 2) image convert therad. */
@@ -85,10 +92,11 @@ int main()
 	//thread send_com_thread(SendXYSignal);
 
 	thread convert_image_thread(&ConvertImage::process_image, image_convertor);
-	thread send_com_thread(SendSolvedXYSignal, ref(gen_scan_routes));
+	//thread send_com_thread(SendSolvedXYSignal, ref(gen_scan_routes));
+	thread send_com_thread(SendSolvedXYSignal);
 	thread nms_filter_thread(threadFilterResamples);
 	thread img_process_thread(threadProcessImage);
-	
+
 	//send_com_thread.join();
 	//cout << "send over!!!!!!!!!!!!!!!!!!" << endl;
 	//convert_image_thread.join();
@@ -107,9 +115,9 @@ int main()
 		//while (midcamera.img_list.size() < scan_samples)
 	{
 		//cout << "mid camera image list: " << midcamera.img_list.size() << endl;
-		
+
 		//std::cout << "get img: " << img_list1.size() << endl;
-		
+
 		//cout << "call back convert imgage: " << midcamera.img_list.size() << endl;
 		this_thread::sleep_for(chrono::microseconds(2000));
 	}
@@ -123,17 +131,65 @@ int main()
 	//convert_image_thread.join();
 
 
-
-	send_com_thread.detach();
-	convert_image_thread.detach();
+	send_com_thread.join();
+	convert_image_thread.join();
 	nms_filter_thread.join();
 	img_process_thread.join();
+
+	while (is_nms_over == false)
+	{
+		this_thread::sleep_for(chrono::milliseconds(10));
+	}
+
+	pixel_error = 0.30;
+	cout << ">>>>>>>>>>>>>>begin second part."<<scan_samples << endl;
+	cout << "The total img list: " << img_list1.size() << " total nums:" << scan_samples << " , " << img_mat_list.empty() << endl;
+	image_convertor.num_samples = scan_samples;
+	//thread send_com_thread(SendXYSignal);
+	thread convert_image_thread1(&ConvertImage::process_image, image_convertor);
+	this_thread::sleep_for(chrono::milliseconds(5));
+	//thread send_com_thread(SendSolvedXYSignal, ref(gen_scan_routes));
+	thread send_com_thread1(SendSolvedXYSignal);
+	this_thread::sleep_for(chrono::milliseconds(5));
+	thread nms_filter_thread1(threadFilterResamples);
+	this_thread::sleep_for(chrono::milliseconds(5));
+	thread img_process_thread1(threadProcessImage);
+
+
+
+
+	while (img_list1.size() < scan_samples)
+		//while (midcamera.img_list.size() < scan_samples)
+	{
+		//cout << "mid camera image list: " << midcamera.img_list.size() << endl;
+
+		//std::cout << "get img: " << img_list1.size() << endl;
+
+		//cout << "call back convert imgage: " << midcamera.img_list.size() << endl;
+		this_thread::sleep_for(chrono::microseconds(2000));
+	}
+
+	//chrono::steady_clock::time_point send_end_time3 = chrono::steady_clock::now();
+	//cout << "The whole process is  get clock (ms): !!!!!!!!!!!!!" << chrono::duration_cast<chrono::microseconds>(send_end_time3 - begin_time2).count() / 1000 << endl;
+
+	//isFrameOK = true;
+
+	//send_com_thread.join();
+	//convert_image_thread.join();
+
+
+
+	send_com_thread1.detach();
+	convert_image_thread1.detach();
+	nms_filter_thread1.join();
+	img_process_thread1.join();
+
 
 
 	//initialization_detect_thread.detach();
 
 
-	
+
 	/*
 	// 11-22
 	std::cout << "The image list remain is: " << img_list1.size() << endl;
@@ -208,12 +264,12 @@ int main()
 
 	*/
 
-	
+
 	auto end_t = chrono::system_clock::now();
 	chrono::steady_clock::time_point end_detect = chrono::steady_clock::now();
 	auto sys_time_end = chrono::high_resolution_clock::now();
 
-	std::cout << "Total time (ms): !!!!!!!!!!!!!" << chrono::duration_cast<chrono::microseconds>(end_detect - begin_time2).count()/1000.0 << endl;
+	std::cout << "Total time (ms): !!!!!!!!!!!!!" << chrono::duration_cast<chrono::microseconds>(end_detect - begin_time2).count() / 1000.0 << endl;
 	std::cout << "Sys Total time (ms): !!!!!!!!!!!!!" << chrono::duration_cast<chrono::microseconds>(end_t - beg_t).count() / 1000.0 << endl;
 	std::cout << "Highresol Total time (ms): !!!!!!!!!!!!!" << chrono::duration_cast<chrono::microseconds>(sys_time_end - sys_time_begin).count() / 1000.0 << endl;
 
@@ -224,7 +280,7 @@ int main()
 	img_list1.clear();
 	bool is_close = CloseCamera();
 
-	
+
 
 	return 0;
 }
@@ -239,14 +295,14 @@ void NMSResamples(vector<ResampleCenters>& resample_centers, vector<ResampleCent
 	for (int i = 0; i < len; i++)
 	{
 		bool is_filtered = false;
-		if (i < len - 1 && is_checked[i]==false) // i=len-1, j=len, the vector will access failed. Segment fault.
+		if (i < len - 1 && is_checked[i] == false) // i=len-1, j=len, the vector will access failed. Segment fault.
 		{
 			for (int j = i + 1; j < len; j++)
 			{
 				float abs_x = abs(resample_centers[i].center_x - resample_centers[j].center_x);
 				float abs_y = abs(resample_centers[i].center_y - resample_centers[j].center_y);
 				double abs_error = double(abs_x) + double(abs_y);
-				if (abs_error < 0.06)
+				if (abs_error < pixel_error)
 				{
 					if (resample_centers[i].num_samples > resample_centers[j].num_samples)
 					{
@@ -288,9 +344,9 @@ void NMSResamples(vector<ResampleCenters>& resample_centers, vector<ResampleCent
 int GenerateResample(vector<vector<float>>& detected_objs_voltages, DetectedResults& detected_results, vector<ResampleCenters>& resample_centers)
 {
 	int nums_detected = detected_results.detected_box.size();
-	int newly_scan_samples = 0.9 * scan_samples;
+	int newly_scan_samples = 0.8 * scan_samples;
 	int global_scan_samples = scan_samples - newly_scan_samples;
-	float total_confs=0.001;
+	float total_confs = 0.001;
 	for (auto i : detected_results.detected_conf)
 	{
 		total_confs += i;
@@ -302,7 +358,7 @@ int GenerateResample(vector<vector<float>>& detected_objs_voltages, DetectedResu
 	for (int i = 0; i < nums_detected; i++)
 	{
 		int scan_id = detected_results.detected_ids[i];
-		if (scan_id!=previous_id)
+		if (scan_id != previous_id)
 		{
 			voltage_index += 1;
 			previous_id = scan_id;
@@ -329,76 +385,30 @@ void SendXYSignal()
 	chrono::steady_clock::time_point begin_time_thre = chrono::steady_clock::now();
 	while (1)
 	{
-		//cout << "´¥·¢Ä£Ê½flag:" << isGrabbingFlag << endl;
-		/*float x, y;
-		cout << "Please input x,y volt:";
-		cin >> x >> y;*/
-
 		if (count == 100)
 		{
 			std::cout << "break the send thread" << endl;
 			break;
 		}
-		//m_Sigmal.on_rotate1_usb(gen_scan_routes[count][0], gen_scan_routes[count][1]);
-		//int sleep_time = 5000;
-		//m_Sigmal.on_rotate1_usb(-4.59, -0.45);
-		//this_thread::sleep_for(chrono::microseconds(sleep_time));
-		//m_Sigmal.on_rotate1_usb(-3.37, 1.79);		
-		//this_thread::sleep_for(chrono::microseconds(sleep_time));
-		//m_Sigmal.on_rotate1_usb(-3.26, 1.8);		
-		//this_thread::sleep_for(chrono::microseconds(sleep_time));
-		//m_Sigmal.on_rotate1_usb(-4.06, 3.2);		
-		//this_thread::sleep_for(chrono::microseconds(sleep_time));
-		//m_Sigmal.on_rotate1_usb(-2.72, 4.59);		
-		//this_thread::sleep_for(chrono::microseconds(sleep_time));
-		//m_Sigmal.on_rotate1_usb(-1.25, 4.23);		
-		//this_thread::sleep_for(chrono::microseconds(sleep_time));
-		//m_Sigmal.on_rotate1_usb(-0.5, 4.28);		
-		//this_thread::sleep_for(chrono::microseconds(sleep_time));
-		//m_Sigmal.on_rotate1_usb(0.57, 4.4);			
-		//this_thread::sleep_for(chrono::microseconds(sleep_time));
-		//m_Sigmal.on_rotate1_usb(1.53, 3.32);		
-		//this_thread::sleep_for(chrono::microseconds(sleep_time));
-		//m_Sigmal.on_rotate1_usb(2.03, 3.12);		
-		//this_thread::sleep_for(chrono::microseconds(sleep_time));
-
-		//if (count % 2 == 0)
-		//{
-		// m_Sigmal.on_rotate1_usb(-3.8, -1.15);
-		//}
-		//else
-		//{
-		//	m_Sigmal.on_rotate1_usb(-3.9, -1.35);
-		//}
-
-		//m_Sigmal.on_rotate1_usb(-4.5 + 0.05 * count, 4.5 - 0.05 * count);
-		// 
 		if (count % 4 == 0)
 		{
 			m_Sigmal.on_rotate1_usb(-2.6, 1.7);
-			//m_Sigmal.on_rotate1_usb(gen_scan_routes[count][0], gen_scan_routes[count][1]);
 		}
 		else if (count % 4 == 1)
 		{
 			m_Sigmal.on_rotate1_usb(-2.8, 2.0);
-			//m_Sigmal.on_rotate1_usb(gen_scan_routes[count][0], gen_scan_routes[count][1]);
 		}
 		else if (count % 4 == 2)
 		{
 			m_Sigmal.on_rotate1_usb(-2.93, 1.8);
-			//m_Sigmal.on_rotate1_usb(gen_scan_routes[count][0], gen_scan_routes[count][1]);
 		}
 		else
 		{
 			m_Sigmal.on_rotate1_usb(-3.25, 1.71);
-			//m_Sigmal.on_rotate1_usb(gen_scan_routes[count][0], gen_scan_routes[count][1]);
 		}
 
 		count++;
-		//count = count + 10;
 		cout << "send signals: " << count << endl;
-		//cout << "send signals: " << count << "; data: ["<< gen_scan_routes[count-1][0] <<"," << gen_scan_routes[count-1][1] << "]" << endl;
-		//Sleep(2);
 		this_thread::sleep_for(chrono::microseconds(1000));
 	}
 	std::cout << "cout the x y is overed!" << endl;
@@ -407,16 +417,16 @@ void SendXYSignal()
 }
 
 // Send the given solved (x, y) signals to COM port.
-bool SendSolvedXYSignal(vector<vector<float>>& solved_scan_voltages)
+void SendSolvedXYSignal()
 {
 	std::cout << "!!!!!!!!! begin to send com thread" << endl;
 	int count = 0;
 	chrono::steady_clock::time_point begin_time_thre = chrono::steady_clock::now();
-	for (int i = 0; i < solved_scan_voltages.size(); i++)
+	for (int i = 0; i < gen_scan_routes.size(); i++)
 	{
 		count++;
 		//cout << "sent " << count << " :[" << solved_scan_voltages[i][0] << "," << solved_scan_voltages[i][1] << "]" << endl;
-		m_Sigmal.on_rotate1_usb(solved_scan_voltages[i][0], solved_scan_voltages[i][1]);
+		m_Sigmal.on_rotate1_usb(gen_scan_routes[i][0], gen_scan_routes[i][1]);
 		this_thread::sleep_for(chrono::microseconds(3000));
 		//while (!is_callback_ok)
 		//{
@@ -424,16 +434,14 @@ bool SendSolvedXYSignal(vector<vector<float>>& solved_scan_voltages)
 		//}
 		//is_callback_ok = false;
 	}
-	std::cout << "Total send: " << count << endl;
-
 	std::cout << "cout the x y is overed!" << endl;
 	chrono::steady_clock::time_point send_end_time2_thre = chrono::steady_clock::now();
 	std::cout << "Send clock (ms): " << chrono::duration_cast<chrono::microseconds>(send_end_time2_thre - begin_time_thre).count() / 1000 << endl;
-	return true;
+	//return true;
 }
 
 // Given the smaples data, solve the scanning routes.
-void SolveScanRoutes(int sample_nums, int max_range, int min_range, vector<vector<float>> &gen_scan_routes)
+vector<vector<float>> SolveScanRoutes(int sample_nums, int max_range, int min_range)
 {
 	chrono::steady_clock::time_point begin_time_ortools = chrono::steady_clock::now();
 	int num_samples = sample_nums;
@@ -472,11 +480,10 @@ void SolveScanRoutes(int sample_nums, int max_range, int min_range, vector<vecto
 	//	std::cout << i << "-> ";
 	//}
 	//std::cout << " " << endl;
-	//chrono::steady_clock::time_point end_time_ortools = chrono::steady_clock::now();
-	//std::cout << "Waitting for save (ms): " << chrono::duration_cast<chrono::microseconds>(end_time_ortools - begin_time_ortools).count() / 1000.0 << endl;
-	//std::cout << "====>>>> 4. Solve the scanning routes succeed." << endl;
-	//return scan_voltages;
-	gen_scan_routes = scan_voltages;
+	chrono::steady_clock::time_point end_time_ortools = chrono::steady_clock::now();
+	std::cout << "Waitting for save (ms): " << chrono::duration_cast<chrono::microseconds>(end_time_ortools - begin_time_ortools).count() / 1000.0 << endl;
+	std::cout << "====>>>> 4. Solve the scanning routes succeed." << endl;
+	return scan_voltages;
 }
 
 // Initilize and connect the COM port.
@@ -505,7 +512,6 @@ void InitializeComPort()
 	Sleep(50);
 	m_Sigmal.on_rotate1_usb(-4.51, -4.51);
 	Sleep(50);
-
 }
 
 // Connecting and setting the camera.
@@ -576,21 +582,15 @@ void InitializeDetector(String cfg_file, String weights_file)
 	detector.detected_results.detected_ids.clear();
 }
 
-// Create folder.
+// Create folder to save image if no exist.
 void CreateFolder(string dir_name)
 {
 	string folderPath = "C:\\CODEREPO\\DahuaGal\\Image\\" + dir_name;
-	//std::string prefix = "G:/test/";
 	if (_access(folderPath.c_str(), 0) == -1)	//If file is not exist.
 	{
 		cout << "Dir is not exist, make dir: " << dir_name << endl;
 		int no_use = _mkdir(folderPath.c_str());
 	}
-
-	//string folderPath = "C:\\CODEREPO\\DahuaGal\\Image\\" + dir_name;
-	//string command;
-	//command = "mkdir " + folderPath;
-	//system(command.c_str());
 }
 
 void threadProcessImage()
@@ -600,7 +600,6 @@ void threadProcessImage()
 	cout << "!!!!!!!! begin the Image processing thread!!!!!!!!" << endl;
 	Mat grab_img2;
 	int real_img_count = 0;
-	int detected_img = 0;
 	//chrono::steady_clock::time_point thread_begin = chrono::steady_clock::now();
 	while (1)
 	{
@@ -615,11 +614,19 @@ void threadProcessImage()
 				bool is_detected = detector.inference(grab_img2, real_img_count);
 				if (is_detected)
 				{
-					detected_img += 1;
-					std::stringstream filename2;
-					filename2 << "./Image/" << dir_name << "/thread_1127_" << real_img_count << "_" << gen_scan_routes[real_img_count][0] << "_" << gen_scan_routes[real_img_count][1] << ".jpg";
 					detected_objs_voltages.emplace_back(gen_scan_routes[real_img_count]);
-					cv::imwrite(filename2.str(), grab_img2);
+					if (is_save_img)
+					{
+						std::stringstream filename2;
+						time_t currenttime = time(0);
+						char tmp[64];
+
+						strftime(tmp, sizeof(tmp), "%Y%m%d_%H%M%S", localtime(&currenttime));
+						string time_str = tmp;
+
+						filename2 << "./Image/" << dir_name << "/"<< time_str<<"_" << real_img_count << "_" << gen_scan_routes[real_img_count][0] << "_" << gen_scan_routes[real_img_count][1] << ".jpg";
+						cv::imwrite(filename2.str(), grab_img2);
+					}
 				}
 				real_img_count += 1;
 			}
@@ -631,34 +638,31 @@ void threadProcessImage()
 			cout << "Image queue is empty" << endl;
 			break;
 		}
-		//else
-		//{
-		//	cout << "Image mat queue is: " << img_mat_list.size() << ", total processing: " << real_img_count << endl;
-		//}
+		else
+		{
+			cout << "Image mat queue is: " << img_mat_list.size() << ", total processing: " << real_img_count<<" total list: "<<scan_samples << endl;
+		}
 	}
 
 	//detector.detected_results.detected_box.clear();
 	//detector.detected_results.detected_conf.clear();
 	//detector.detected_results.detected_ids.clear();
-
 	is_detect_done = true;
 	detect_nms_cv.notify_one();
 	cout << "End detected thread!!!!!!" << endl;
-
 }
 
 void threadFilterResamples()
 {
-	//mutex detect_nms_mutex;
-	//condition_variable detect_nms_cv;
-	//bool is_detect_done = false;
-	cout << " thread filter NMS is start!!!!!!!!!!!!!!!" << endl;
+	cout << ">>>>>>>>>>>>Begin filter thread!!!!" << endl;
 	unique_lock<mutex> lck(detect_nms_mutex);
 	detect_nms_cv.wait(lck, [] {return is_detect_done; });
-	cout << "NMS thread, begin to nms the detection!!!" << endl;
+
+	is_detect_done = false;
 	vector<ResampleCenters> resample_centers;
 	vector<ResampleCenters> filtered_centers;
 	int total_sample_nums = 0;
+
 	if (detected_objs_voltages.size() > 0)
 	{
 		total_sample_nums = GenerateResample(detected_objs_voltages, detector.detected_results, resample_centers);
@@ -678,26 +682,29 @@ void threadFilterResamples()
 	detector.detected_results.detected_box.clear();
 	detector.detected_results.detected_conf.clear();
 	detector.detected_results.detected_ids.clear();
+	img_list1.clear();
 	gen_scan_routes.clear();
 
-
+	int temp_i = 0;
 	for (auto j : filtered_centers)
 	{
 		cout << " begin new scan: " << endl;
 		cout << "after filtered: " << j.num_samples << ",  " << j.center_x << ", " << j.center_y << ", " << j.confidence << endl;
 
-		//vector<vector<float>> gen_scan_routes = SolveScanRoutes(j.num_samples, int(50.0 * 1.0 / j.confidence), int(-50.0 * 1.0 / j.confidence));
-		SolveScanRoutes(j.num_samples, int(50.0 * 1.0 / j.confidence), int(-50.0 * 1.0 / j.confidence), gen_scan_routes);
-		for (int i = 0; i < gen_scan_routes.size(); i++)
+		vector<vector<float>> scan_routes_j = SolveScanRoutes(j.num_samples, int(50.0 * 1.0 / j.confidence), int(-50.0 * 1.0 / j.confidence));
+		//SolveScanRoutes(j.num_samples, int(50.0 * 1.0 / j.confidence), int(-50.0 * 1.0 / j.confidence), gen_scan_routes);
+		for (int i = 0; i < scan_routes_j.size(); i++)
 		{
-			gen_scan_routes[i][0] += j.center_x;
-			gen_scan_routes[i][1] += j.center_y;
+			scan_routes_j[i][0] += j.center_x;
+			scan_routes_j[i][1] += j.center_y;
 			//cout << gen_scan_routes[i][0] << ", " << gen_scan_routes[i][1] << endl;
 		}
-
-
+		gen_scan_routes.insert(gen_scan_routes.end(), scan_routes_j.begin(), scan_routes_j.end());
+		temp_i += scan_routes_j.size();
+		cout <<"scan routes: " << scan_routes_j[scan_routes_j.size() - 1][0] << ", total_list: " << gen_scan_routes[temp_i - 1][0] << endl;
+		//cout << "Gen scan routes: " << gen_scan_routes.size() << endl;
 	}
-
-
-
+	cout << "End the NMS thread!!!!!!!!" << endl;
+	scan_samples = gen_scan_routes.size();
+	is_nms_over = true;
 }

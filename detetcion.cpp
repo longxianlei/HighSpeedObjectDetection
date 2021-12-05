@@ -7,20 +7,20 @@ ObjectDetector::ObjectDetector()
 
 ObjectDetector::~ObjectDetector()
 {
-    
+
 }
 
 void ObjectDetector::initialization(cv::String cfg, cv::String weight, int input_width, int input_height)
 {
-	net = cv::dnn::readNetFromDarknet(cfg, weight);
-	net.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-	net.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+    net = cv::dnn::readNetFromDarknet(cfg, weight);
+    net.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+    net.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
 
     // CPU
-	//net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+    //net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
     //net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
 
-	inpWidth = input_width, inpHeight = input_height;
+    inpWidth = input_width, inpHeight = input_height;
     //将类名存进容器
     string classesFile = "C:\\CODEREPO\\DahuaGal\\model\\coco.names";//coco.names包含80种不同的类名
     ifstream ifs(classesFile.c_str());
@@ -31,7 +31,7 @@ void ObjectDetector::initialization(cv::String cfg, cv::String weight, int input
 
 bool  ObjectDetector::inference(cv::Mat& frame, int frame_id)
 {
-    cv::Mat blob = cv::dnn::blobFromImage(frame, 1.0 / 255.0, { inpWidth, inpHeight}, 0.00392, true); //1.0 / 255.0  0.00392
+    cv::Mat blob = cv::dnn::blobFromImage(frame, 1.0 / 255.0, { inpWidth, inpHeight }, 0.00392, true); //1.0 / 255.0  0.00392
     net.setInput(blob);
     vector<Mat> detectionMat;
     try {
@@ -105,11 +105,11 @@ bool ObjectDetector::postprocess(cv::Mat& frame, const vector<cv::Mat>& outs, in
     bool is_target = false;
     bool is_target_frame = false;
     for (size_t i = 0; i < indices.size(); i++) {
-        
-        is_target = false; 
+
+        is_target = false;
         int idx = indices[i];
         cv::Rect box = boxes[idx];
-        cout <<"class: "<< classIds[idx] <<", conf: " << confidences[idx] << endl;
+        cout << "class: " << classIds[idx] << ", conf: " << confidences[idx] << endl;
         is_target = classIds[idx] == 2;
 
         drawPred(classIds[idx], confidences[idx], box.x, box.y,
@@ -123,7 +123,7 @@ bool ObjectDetector::postprocess(cv::Mat& frame, const vector<cv::Mat>& outs, in
             detected_results.detected_box.emplace_back(box);
             detected_results.detected_ids.emplace_back(frame_id);
         }
-        
+
     }
     return is_target_frame;
     //return is_target; 

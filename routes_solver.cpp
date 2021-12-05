@@ -1,6 +1,6 @@
 #include "routes_solver.h"
- 
-namespace operations_research{
+
+namespace operations_research {
 
     // @brief Generate distance matrix.
     std::vector<std::vector<int64_t>> ComputeEuclideanDistanceMatrix(
@@ -37,9 +37,9 @@ namespace operations_research{
         }
         return routes;
     }
-    
+
     vector<vector<int>> GenerateSamples(int num_samples, int max_range, int min_range)
-    //void GenerateSamples(int num_samples,vector<vector<int>>& source_data)
+        //void GenerateSamples(int num_samples,vector<vector<int>>& source_data)
     {
         vector<vector<int>> source_data(num_samples, vector<int>(2, 0));
         //int min_range = -500, max_range = 500;
@@ -81,7 +81,7 @@ namespace operations_research{
     }
 
     vector<vector<int64_t>> ComputeChebyshevDistanceMatrix(int num_samples, vector<vector<int>>& scan_data)
-    //void ComputeChebyshevDistanceMatrix(int num_samples, vector<vector<int>> & scan_data, vector<vector<int64_t>>& chebyshev_dist)
+        //void ComputeChebyshevDistanceMatrix(int num_samples, vector<vector<int>> & scan_data, vector<vector<int64_t>>& chebyshev_dist)
     {
         vector<vector<int64_t>> chebyshev_dist(num_samples, vector<int64_t>(num_samples, 0));
         for (int i = 0; i < num_samples; i++)
@@ -130,7 +130,7 @@ namespace operations_research{
         //RoutingIndexManager manager(data.distance_matrix.size(), data.num_vehicles,
         //    data.depot);
         RoutingIndexManager manager(data.distance_matrix.size(), data.num_vehicles,
-        data.starts, data.ends);
+            data.starts, data.ends);
         // [END index_manager]
 
         // Create Routing Model.
