@@ -48,7 +48,7 @@ void ConvertImage::process_image()
 		//cout << "img list in the queue: " << img_list1.size() << endl;
 		if (image_safe_queue.empty() && img_list1.size() == num_samples)
 		{
-			cout << "Image queue is empty" << endl;
+			cout << "!!! End Image Convert Thread" << endl;
 			break;
 		}
 		//else

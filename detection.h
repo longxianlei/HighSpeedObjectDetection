@@ -34,6 +34,7 @@ class ObjectDetector {
 public:
 	ObjectDetector();
 	~ObjectDetector();
+
 public:
 	// Initialize the parameters.
 	float confThreshold = 0.65;//置信度阈值
@@ -42,13 +43,8 @@ public:
 	int inpHeight = 416;//网络输入图片高度
 	vector<string> classes;//储存名字的容器
 	cv::dnn::Net net;
-
-	//vector<float> detected_conf;
-	//vector<Rect> detected_box;
-	//vector<int> detected_ids;
 	DetectedResults detected_results;
-	//detected_results.
-
+	bool is_save_img=false;
 
 public:
 	void initialization(cv::String cfg, cv::String weight, int input_width, int input_height);

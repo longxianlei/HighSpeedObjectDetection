@@ -31,8 +31,8 @@ void ObjectDetector::initialization(cv::String cfg, cv::String weight, int input
 
 bool  ObjectDetector::inference(cv::Mat& frame, int frame_id)
 {
-    cv::Mat blob = cv::dnn::blobFromImage(frame, 1.0 / 255.0, { inpWidth, inpHeight }, 0.00392, true); //1.0 / 255.0  0.00392
-    net.setInput(blob);
+	cv::Mat blob = cv::dnn::blobFromImage(frame, 1.0 / 255.0, { inpWidth, inpHeight }, 0.00392, true); //1.0 / 255.0  0.00392
+	net.setInput(blob);
     vector<Mat> detectionMat;
     try {
         net.forward(detectionMat, getOutputsNames(net));
@@ -109,11 +109,14 @@ bool ObjectDetector::postprocess(cv::Mat& frame, const vector<cv::Mat>& outs, in
         is_target = false;
         int idx = indices[i];
         cv::Rect box = boxes[idx];
-        cout << "class: " << classIds[idx] << ", conf: " << confidences[idx] << endl;
+        //cout <<"frame id: "<< frame_id << "class: " << classIds[idx] << ", conf: " << confidences[idx] << endl;
         is_target = classIds[idx] == 2;
 
-        drawPred(classIds[idx], confidences[idx], box.x, box.y,
-            box.x + box.width, box.y + box.height, frame);
+        if (is_save_img)
+        {
+            drawPred(classIds[idx], confidences[idx], box.x, box.y,
+                box.x + box.width, box.y + box.height, frame);
+        }
 
         //cout << is_target << endl;
         if (is_target)

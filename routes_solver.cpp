@@ -177,7 +177,7 @@ namespace operations_research {
 
         // Print solution on console.
         // [START print_solution]
-        PrintSolution(manager, routing, *solution);
+        //PrintSolution(manager, routing, *solution);
         // [END print_solution]
 
         // Generate the routes into an array.
@@ -241,7 +241,7 @@ namespace operations_research {
 
         // Print solution on console.
         // [START print_solution]
-        PrintSolution(manager, routing, *solution);
+        //PrintSolution(manager, routing, *solution);
         // [END print_solution]
 
         // Generate the routes into an array.

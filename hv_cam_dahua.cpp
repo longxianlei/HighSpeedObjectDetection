@@ -79,7 +79,7 @@ void HV_CAM_DAHUA::onCallbackfun(const CFrame& pFrame)
 	//is_callback_ok = true;
 	CFrame temp = pFrame;
 	image_safe_queue.push(temp.clone());
-	
+
 
 	//openParam.width = pFrame.getImageWidth();
 	//openParam.height = pFrame.getImageHeight();
